@@ -83,6 +83,7 @@ const LoginPage = () => {
         // Save auth token to localStorage/sessionStorage
         localStorage.setItem('authToken', data.token || 'authenticated');
         localStorage.setItem('userData', JSON.stringify(data.user || {}));
+        localStorage.setItem('hotels', data.allowed_hotel);
 
         navigate('/dashboard');
       } else {

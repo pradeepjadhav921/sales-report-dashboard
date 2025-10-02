@@ -84,6 +84,7 @@ const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [selectedHotel, setSelectedHotel] = useState('All');
   const [timeFilter, setTimeFilter] = useState('Day');
+  const [hotelsList, setHotelsList] = useState([]);
   const [startDate, setStartDate] = useState(() => {
     const date = new Date();
     date.setHours(0, 0, 0, 0);
@@ -98,6 +99,17 @@ const DashboardPage = () => {
   // --- CHANGE 1: Add theme and media query hooks to detect mobile screens ---
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+
+  useEffect(() => {
+    const loadData = async () => {
+     const hotels = localStorage.getItem('hotels');
+     const hotels_list = hotels.split(",");
+     setHotelsList(hotels_list);
+    };
+    loadData();
+  }, []);
+
 
   useEffect(() => {
     const loadData = async () => {
@@ -115,6 +127,14 @@ const DashboardPage = () => {
   }, []);
 
   const hotelNames = useMemo(() => ['All', ...new Set(transactions.map(t => t.hotel_name).filter(Boolean))], [transactions]);
+
+  // const hotelNames = useMemo(() => {
+  //   const uniqueHotels = [...new Set(transactions
+  //     .map(t => t.hotel_name)
+  //     .filter(name => name && hotelsList.includes(name))
+  //   )];
+  //   return ['All', ...uniqueHotels];
+  // }, [transactions, hotelsList]);
 
   const chartData = useMemo(() => {
     const hotelFiltered = transactions.filter(t => selectedHotel === 'All' || t.hotel_name === selectedHotel);
