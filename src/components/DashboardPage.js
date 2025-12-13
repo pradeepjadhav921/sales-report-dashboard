@@ -1,17 +1,20 @@
 // src/components/DashboardPage.js
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { fetchTransactions } from '../api';
 import SalesChart from './SalesChart';
 import {
   AppBar, Toolbar, Typography, Container, Select, MenuItem, FormControl, InputLabel,
-  Paper, TableContainer, Table, TableHead, TableRow, TableCell, TableBody,
-  Box, CircularProgress, Collapse, IconButton, Grid, useMediaQuery, useTheme
+  Paper, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Dialog,
+  Box, CircularProgress, Collapse, IconButton, Grid, useMediaQuery, useTheme,
+  DialogTitle, List, ListItemButton, ListItemText
 } from '@mui/material';
 
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+
 
 
 const TransactionRow = ({ row, sx }) => {
@@ -80,6 +83,7 @@ const TransactionRow = ({ row, sx }) => {
 
 
 const DashboardPage = () => {
+  const navigate = useNavigate();
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedHotel, setSelectedHotel] = useState('All');
@@ -100,6 +104,27 @@ const DashboardPage = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
+  const handleActionChange = (event) => {
+    const page = event.target.value;
+    if (page === 'InventoryPage' || page === 'profit-report') {
+      setActionTarget(page); // Set which page we're targeting
+      setIsHotelSelectionOpen(true);
+    }  else if (page) {
+      navigate(`/${page}`);
+    }
+  };
+
+  const [isHotelSelectionOpen, setIsHotelSelectionOpen] = useState(false);
+  const [actionTarget, setActionTarget] = useState(''); // To know where to navigate
+
+  const handleHotelSelectAndNavigate = (hotelName) => {
+    setIsHotelSelectionOpen(false);
+    if (actionTarget === 'InventoryPage') {
+      navigate(`/inventory/${hotelName}`);
+    } else {
+      navigate(`/${actionTarget}/${hotelName}`);
+    }
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -211,12 +236,45 @@ const DashboardPage = () => {
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <AppBar position="static"><Toolbar><Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>Sales Dashboard</Typography></Toolbar></AppBar>
+      <AppBar position="static">
+        <Toolbar>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            Sales Dashboard
+          </Typography>
+          <FormControl sx={{ m: 1, minWidth: 120 }} size="small">
+            <InputLabel id="actions-select-label" sx={{ color: 'white', '&.Mui-focused': { color: 'white' } }}>Actions</InputLabel>
+            <Select labelId="actions-select-label" label="Actions" onChange={handleActionChange} value="" sx={{ color: 'white', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.5)' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'white' }, '.MuiSvgIcon-root': { color: 'white' } }}>
+              <MenuItem value="InventoryPage">Inventory</MenuItem>
+              <MenuItem value="profit-report">Profit Report</MenuItem>
+              <MenuItem value="gst-report">GST Report</MenuItem>
+              <MenuItem value="tally-reports">Tally Reports</MenuItem>
+            </Select>
+          </FormControl>
+        </Toolbar>
+      </AppBar>
+      <Dialog onClose={() => setIsHotelSelectionOpen(false)} open={isHotelSelectionOpen}>
+        <DialogTitle>Select a Hotel</DialogTitle>
+        <List sx={{ pt: 0 }}>
+          {hotelNames.filter(name => name !== 'All').map((hotel) => (
+            <ListItemButton onClick={() => handleHotelSelectAndNavigate(hotel)} key={hotel}>
+              <ListItemText primary={hotel.replaceAll("_", " ")} />
+            </ListItemButton>
+          ))}
+        </List>
+      </Dialog>
       <Container maxWidth="xl" sx={{ mt: {xs: 2, sm: 4}, mb: 4, px: { xs: 0, sm: 3 } }}>
         <Paper sx={{ p: { xs: 1, sm: 2 }, mb: { xs: 2, sm: 3 } }}>
           <Grid container spacing={{ xs: 1, sm: 3 }} alignItems="center">
             <Grid item xs={12} sm={6}><FormControl fullWidth size="small"><InputLabel>Hotel Name</InputLabel><Select value={selectedHotel} label="Hotel Name" onChange={(e) => setSelectedHotel(e.target.value)}>{hotelNames.map(name => <MenuItem key={name} value={name}>{name}</MenuItem>)}</Select></FormControl></Grid>
             <Grid item xs={12} sm={6}><FormControl fullWidth size="small"><InputLabel>Time Period</InputLabel><Select value={timeFilter} label="Time Period" onChange={(e) => setTimeFilter(e.target.value)}><MenuItem value="Day">Last 7 Days</MenuItem><MenuItem value="Month">Last 7 Months</MenuItem><MenuItem value="Year">Last 7 Years</MenuItem></Select></FormControl></Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Hotel Name</InputLabel>
+                <Select value={selectedHotel} label="Hotel Name" onChange={(e) => setSelectedHotel(e.target.value)}>
+                  {hotelNames.map(name => <MenuItem key={name} value={name}>{name}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
           </Grid>
         </Paper>
 
@@ -306,6 +364,14 @@ const DashboardPage = () => {
                 <Box sx={{ textAlign: 'center', }}>
                   <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: { xs: '0.65rem', sm: '0.875rem' } }}>
                     {isMobile ? "UPI" : "UPI"}
+                  </Typography>
+                  <Typography variant="h6" sx={{ color: '#1565c0', fontSize: { xs: '0.8rem', sm: '1.25rem' } }}>
+                    ₹{tableTotals.upi.toLocaleString()}
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: 'center', }}>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: { xs: '0.65rem', sm: '0.875rem' } }}>
+                    {isMobile ? "Profit" : "PROFIT"}
                   </Typography>
                   <Typography variant="h6" sx={{ color: '#1565c0', fontSize: { xs: '0.8rem', sm: '1.25rem' } }}>
                     ₹{tableTotals.upi.toLocaleString()}
