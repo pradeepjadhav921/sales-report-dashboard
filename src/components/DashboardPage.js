@@ -1,8 +1,6 @@
-// src/components/DashboardPage.js
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchTransactions } from '../api';
+import { fetchTransactions, syncTransactions } from '../api';
 import SalesChart from './SalesChart';
 import {
   AppBar, Toolbar, Typography, Container, Select, MenuItem, FormControl, InputLabel,
@@ -10,7 +8,7 @@ import {
   Box, CircularProgress, Collapse, IconButton, Grid, useMediaQuery, useTheme,
   DialogTitle, List, ListItemButton, ListItemText
 } from '@mui/material';
-
+import SyncIcon from '@mui/icons-material/Sync';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -82,7 +80,7 @@ const TransactionRow = ({ row, sx }) => {
 };
 
 
-const DashboardPage = () => {
+export const DashboardPage = () => {
   const navigate = useNavigate();
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -99,10 +97,39 @@ const DashboardPage = () => {
     date.setHours(23, 59, 59, 999);
     return date;
   });
+  const hotelNames = useMemo(() => ['All', ...new Set(transactions.map(t => t.hotel_name).filter(Boolean))], [transactions]);
 
   // --- CHANGE 1: Add theme and media query hooks to detect mobile screens ---
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  useEffect(() => {
+    const loadData = async () => {
+     const hotels = localStorage.getItem('hotels');
+     const hotels_list = hotels.split(",");
+     setHotelsList(hotels_list);
+    };
+    loadData();
+  }, []);
+
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const data = await fetchTransactions();
+        setTransactions(data);
+        console.log("transactions useeffect ",data);
+      } catch (error) {
+        console.error('Error fetching transactions:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+
 
   const handleActionChange = (event) => {
     const page = event.target.value;
@@ -126,32 +153,21 @@ const DashboardPage = () => {
     }
   };
 
-  useEffect(() => {
-    const loadData = async () => {
-     const hotels = localStorage.getItem('hotels');
-     const hotels_list = hotels.split(",");
-     setHotelsList(hotels_list);
-    };
-    loadData();
-  }, []);
+  const handleSync = async () => {
+    setLoading(true);
+    try {
+      const data = await syncTransactions();
+      setTransactions(data);
+    } catch (error) {
+      console.error('Error syncing transactions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        const data = await fetchTransactions();
-        setTransactions(data);
-      } catch (error) {
-        console.error('Error fetching transactions:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, []);
 
-  const hotelNames = useMemo(() => ['All', ...new Set(transactions.map(t => t.hotel_name).filter(Boolean))], [transactions]);
+
 
   // const hotelNames = useMemo(() => {
   //   const uniqueHotels = [...new Set(transactions
@@ -163,7 +179,7 @@ const DashboardPage = () => {
 
   const chartData = useMemo(() => {
     const hotelFiltered = transactions.filter(t => selectedHotel === 'All' || t.hotel_name === selectedHotel);
-    console.log("hotelFiltered",hotelFiltered)
+    console.log("hotelFiltered",selectedHotel,transactions)
     const now = new Date();
     const toLocalISOString = (date) => {
       if (!date) return null;
@@ -177,9 +193,9 @@ const DashboardPage = () => {
       return last7Days.map(day => {
         // --- 2. USE THE HELPER FUNCTION HERE ---
         const dayString = toLocalISOString(day);
-        const totalSales = hotelFiltered
-            .filter(t => toLocalISOString(new Date(t.transaction_time)) === dayString) // <-- AND HERE
+        const totalSales = hotelFiltered .filter(t => toLocalISOString(new Date(t.transaction_time)) === dayString) // <-- AND HERE
             .reduce((acc, curr) => acc + parseFloat(curr.total_amount || 0), 0);
+        console.log("totalSales",totalSales);
         return { name: day.toLocaleString('en-US', { weekday: 'short', day: 'numeric' }), Sales: totalSales };
       });
     }
@@ -201,6 +217,8 @@ const DashboardPage = () => {
     }
     return [];
   }, [transactions, selectedHotel, timeFilter]);
+
+
   
   const tableData = useMemo(() => {
     const effectiveEndDate = endDate ? new Date(endDate) : null;
@@ -241,6 +259,12 @@ const DashboardPage = () => {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             Sales Dashboard
           </Typography>
+          <IconButton
+            color="inherit"
+            onClick={handleSync}
+          >
+            <SyncIcon />
+          </IconButton>
           <FormControl sx={{ m: 1, minWidth: 120 }} size="small">
             <InputLabel id="actions-select-label" sx={{ color: 'white', '&.Mui-focused': { color: 'white' } }}>Actions</InputLabel>
             <Select labelId="actions-select-label" label="Actions" onChange={handleActionChange} value="" sx={{ color: 'white', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.5)' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'white' }, '.MuiSvgIcon-root': { color: 'white' } }}>

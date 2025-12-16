@@ -6,6 +6,7 @@ import {
   Select, MenuItem, FormControl, InputLabel, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import { ArrowBack as ArrowBackIcon, ExpandMore as ExpandMoreIcon, AddPhotoAlternate as AddPhotoAlternateIcon } from '@mui/icons-material';
+import { fetchMenu } from '../api';
 
 const AddItemPage = () => {
   const navigate = useNavigate();
@@ -18,10 +19,8 @@ const AddItemPage = () => {
     h_price: '',
     f_price: '',
     category: '',
-    // Add all other fields from your Flutter page here with default values
     mrp: '',
     purchasePrice: '',
-    parchesPrice: '',
     acSellPrice: '',
     acSellPriceHalf: '',
     hsnCode: '',
@@ -35,7 +34,7 @@ const AddItemPage = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '' });
 
   // State for categories and the add category dialog
-  const [categories, setCategories] = useState(["Starters", "Main Course", "Desserts", "Drinks"]);
+  const [categories, setCategories] = useState([]);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [newCategory, setNewCategory] = useState('');
 
@@ -49,7 +48,7 @@ const AddItemPage = () => {
         f_price: item.f_price || '',
         category: item.category || '',
         mrp: item.mrp || '',
-        purchasePrice: item.purchasePrice || '',
+        purchasePrice: item.purchaseprice || '',
         acSellPrice: item.ac_price || '',
         acSellPriceHalf: item.ac_price_half || '',
         hsnCode: item.hsnCode || '',
@@ -61,6 +60,24 @@ const AddItemPage = () => {
     }
   }, [isEditing, location.state]);
 
+  useEffect(() => {
+    const loadCategories = async () => {
+      const hotelName = location.state?.hotelName;
+      if (hotelName) {
+        try {
+          const menuItems = await fetchMenu(hotelName);
+          if (menuItems && menuItems.length > 0) {
+            const uniqueCategories = [...new Set(menuItems.map(item => item.menu).filter(Boolean))];
+            setCategories(uniqueCategories.sort());
+          }
+        } catch (error) {
+          console.error("Failed to load categories:", error);
+          setSnackbar({ open: true, message: 'Could not load categories.' });
+        }
+      }
+    };
+    loadCategories();
+  }, [location.state]);
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormState(prev => ({ ...prev, [name]: value }));
@@ -167,12 +184,22 @@ const AddItemPage = () => {
             <TextField
               name="name"
               label="Product/Service Name"
-              value={formState.name}
+              value={formState.submenu}
               onChange={handleInputChange}
               fullWidth
               required
             />
           </Grid>
+          {/* <Grid item xs={12}>
+            <TextField
+              name="name"
+              label="Product/Service Name"
+              value={formState.MenuItem}
+              onChange={handleInputChange}
+              fullWidth
+              required
+            />
+          </Grid> */}
           <Grid item xs={12} sm={6}>
             <TextField
               name="h_price"
@@ -225,7 +252,7 @@ const AddItemPage = () => {
           </Grid>
             <Grid item xs={12} sm={6}>
             <TextField
-              name="purchasePricee"
+              name="purchasePrice"
               label="Purchase Price"
               value={formState.purchasePrice}
               onChange={handleInputChange}

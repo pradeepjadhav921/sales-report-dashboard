@@ -4,10 +4,11 @@ import {
   Grid, Box, CircularProgress, Fab, Dialog, DialogActions, DialogContent,
   DialogTitle, Button, Snackbar
 } from '@mui/material';
-import { Add as AddIcon, Search as SearchIcon, Clear as ClearIcon, Check as CheckIcon, Image as ImageIcon, ArrowBack as ArrowBackIcon } from '@mui/icons-material';
+import { Add as AddIcon, Search as SearchIcon, Clear as ClearIcon, Check as CheckIcon, Image as ImageIcon, ArrowBack as ArrowBackIcon, Sync as SyncIcon } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
+import { fetchMenu, syncMenu } from '../api';
 
-const InventoryPage = () => {
+export const InventoryPage = () => {
   const navigate = useNavigate();
   const { hotelName } = useParams(); // Get hotelName from URL
   const [items, setItems] = useState([]);
@@ -23,48 +24,42 @@ const InventoryPage = () => {
   const [stockToAdd, setStockToAdd] = useState('');
 
   useEffect(() => {
-    const fetchMenu = async () => {
+    const loadMenu = async () => {
       setLoading(true);
-      if (!hotelName) {
-        setError("Hotel name not provided in URL.");
-        setLoading(false);
-        return;
-      }
       try {
-        const response = await fetch(
-          `https://api2.nextorbitals.in/api/get_menu.php?hotel_name=${hotelName}&menutype=ac`, {
-            headers: { 'Content-Type': 'application/json' },
-          }
-        );
-        if (response.ok) {
-          const jsonData = await response.json();
-          if (jsonData.data && Array.isArray(jsonData.data)) {
-            // Add a unique id to each item for React keys
-            const menuItems = jsonData.data.map((item, index) => ({ ...item, id: item.id || `${item.name}-${index}` }));
-            setItems(menuItems);
-          } else {
-            setError("Menu data is not in the expected format.");
-          }
-        } else {
-          setError(`HTTP Error: ${response.status} ${response.statusText}`);
-        }
+        const menuItems = await fetchMenu(hotelName);
+        setItems(menuItems);
       } catch (err) {
-        setError(`Failed to fetch menu: ${err.message}`);
+        setError(err.message);
         console.error("Error fetching menu:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchMenu();
+    loadMenu();
   }, [hotelName]); // Re-run effect if hotelName changes
+
+  const handleSync = async () => {
+    setLoading(true);
+    try {
+      const menuItems = await syncMenu(hotelName);
+      setItems(menuItems);
+      setSnackbar({ open: true, message: 'Menu synced successfully!' });
+    } catch (err) {
+      setError(err.message);
+      console.error("Error syncing menu:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredItems = useMemo(() => {
     if (!searchQuery) {
       return items;
     }
     return items.filter(item =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase())
+      item.submenu && typeof item.submenu === 'string' && item.submenu.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [items, searchQuery]);
 
@@ -135,6 +130,9 @@ const InventoryPage = () => {
               Inventory ({filteredItems.length})
             </Typography>
           )}
+          <IconButton color="inherit" onClick={handleSync}>
+            <SyncIcon />
+          </IconButton>
           {isSearching ? (
             <IconButton color="inherit" onClick={() => { setSearchQuery(''); setIsSearching(false); }}>
               <ClearIcon />
@@ -158,7 +156,7 @@ const InventoryPage = () => {
               <Grid item key={item.id}>
                 <Card
                   sx={{ width: 350, display: 'flex', flexDirection: 'column', height: '100%', cursor: 'pointer' }}
-                  onClick={() => navigate(`/edit-item/${item.id}`, { state: { item } })}
+                  onClick={() => navigate(`/edit-item/${item.id}`, { state: { item, hotelName } })}
                 >
                   <CardContent sx={{ flexGrow: 1 }}>
                     <Box sx={{ display: 'flex', mb: 2 }}>
@@ -199,14 +197,14 @@ const InventoryPage = () => {
         color="primary"
         aria-label="add"
         sx={{ position: 'fixed', bottom: 16, right: 16 }}
-        onClick={() => navigate('/add-item')}
+        onClick={() => navigate('/add-item', { state: { hotelName } })}
       >
         <AddIcon />
       </Fab>
 
       {/* Adjust Stock Dialog */}
       <Dialog open={dialogOpen} onClose={handleCloseDialog}>
-        <DialogTitle>Adjust Stock for {currentItem?.name}</DialogTitle>
+        <DialogTitle>Adjust Stock for {currentItem?.submenu}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus

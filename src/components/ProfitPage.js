@@ -9,7 +9,7 @@ import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { fetchTransactions } from '../api';
 
-const ProfitPage = () => {
+export const ProfitPage = () => {
   const navigate = useNavigate();
   const { hotelName } = useParams();
   const [transactions, setTransactions] = useState([]);
@@ -93,7 +93,7 @@ const ProfitPage = () => {
             const menuItem = menuMap.get(baseItemName);
 
             if (menuItem) {
-              let purchasePrice = parseFloat(menuItem.purchasePrice) || 0;
+              let purchasePrice = parseFloat(menuItem.purchaseprice) || 0;
               const sellingPrice = parseFloat(cartItem.sellPrice) || 0;
               const quantity = parseInt(cartItem.qty, 10) || 0;
 
@@ -178,17 +178,22 @@ const ProfitPage = () => {
                 <TableCell>Item Name</TableCell>
                 <TableCell align="right">Qty Sold</TableCell>
                 <TableCell align="right">Selling Price</TableCell>
+                <TableCell align="right">total Sell</TableCell>
                 <TableCell align="right">Purchase Price</TableCell>
+                <TableCell align="right">Total Purchase</TableCell>
                 <TableCell align="right">Profit</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {profitData.itemProfits.map((item) => (
+                console.log("item",item),
                 <TableRow key={item.name}>
                   <TableCell component="th" scope="row">{item.name}</TableCell>
                   <TableCell align="right">{item.qtySold}</TableCell>
                   <TableCell align="right">₹{item.sellingPrice.toFixed(2)}</TableCell>
+                  <TableCell align="right">₹{(item.sellingPrice * item.qtySold).toFixed(2)}</TableCell>
                   <TableCell align="right">₹{item.purchasePrice.toFixed(2)}</TableCell>
+                  <TableCell align="right">₹{(item.purchasePrice * item.qtySold).toFixed(2)}</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 'bold' }}>
                     ₹{item.totalProfit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </TableCell>
