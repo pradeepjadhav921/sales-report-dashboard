@@ -4,12 +4,13 @@ import {
   Grid, Box, CircularProgress, Fab, Dialog, DialogActions, DialogContent,
   DialogTitle, Button, Snackbar
 } from '@mui/material';
-import { Add as AddIcon, Search as SearchIcon, Clear as ClearIcon, Check as CheckIcon, Image as ImageIcon, ArrowBack as ArrowBackIcon, Sync as SyncIcon } from '@mui/icons-material';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Add as AddIcon, Search as SearchIcon, Clear as ClearIcon, Check as CheckIcon, Image as ImageIcon, ArrowBack as ArrowBackIcon, Sync as SyncIcon, TimerOutlined } from '@mui/icons-material';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { fetchMenu, syncMenu } from '../api';
 
 export const InventoryPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { hotelName } = useParams(); // Get hotelName from URL
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,13 +22,19 @@ export const InventoryPage = () => {
   // State for Adjust Stock Dialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentItem, setCurrentItem] = useState(null);
-  const [stockToAdd, setStockToAdd] = useState('');
+  const [stockToAdd, setStockToAdd] = useState(0);
+  const [lastid, setLastId] = useState(0);
 
   useEffect(() => {
     const loadMenu = async () => {
       setLoading(true);
       try {
         const menuItems = await fetchMenu(hotelName);
+        if (menuItems && menuItems.length > 0) {
+          const lastItem = menuItems[menuItems.length - 1];
+          const numericPart = String(lastItem.id).replace(/\D/g, '');
+          setLastId(numericPart ? parseInt(numericPart, 10) : menuItems.length);
+        }
         setItems(menuItems);
       } catch (err) {
         setError(err.message);
@@ -38,7 +45,7 @@ export const InventoryPage = () => {
     };
 
     loadMenu();
-  }, [hotelName]); // Re-run effect if hotelName changes
+  }, [hotelName, location.state?.itemUpdated]); // Re-run effect if hotelName changes or an item was updated
 
   const handleSync = async () => {
     setLoading(true);
@@ -68,42 +75,129 @@ export const InventoryPage = () => {
     e.stopPropagation(); 
 
     setCurrentItem(item);
-    setStockToAdd('');
+    setStockToAdd(0);
     setDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setCurrentItem(null);
+
   };
 
-  const handleAdjustStock = () => {
-    const addValue = parseInt(stockToAdd, 10);
-    if (isNaN(addValue) || addValue <= 0) {
-      setSnackbar({ open: true, message: 'Please enter a valid number.' });
+
+  const saveItemQTY = async (id, name, qty) => {
+    const localStorageKey = `qty_${hotelName}`;
+    let storedMenuItems = JSON.parse(localStorage.getItem(localStorageKey) || '[]');
+
+    const existingItemIndex = storedMenuItems.findIndex(item => item.id === id);
+
+    if (existingItemIndex !== -1) {
+      storedMenuItems[existingItemIndex] = {
+        ...storedMenuItems[existingItemIndex],
+        adjustStock: qty
+      };
+    } else {
+      storedMenuItems.push({ id, name, adjustStock: qty });
+    }
+    localStorage.setItem(localStorageKey, JSON.stringify(storedMenuItems));
+  };
+
+
+ const handleAdjustStock = async () => {
+
+    const stockValue = stockToAdd; // STRING
+
+    // strict validation (digits only)
+    if (stockValue < 0) {
+      setSnackbar({ open: true, message: 'Please enter a valid stock number.' });
       return;
     }
 
-    // This is a simulation. In a real app, you would send this update to your backend.
-    setItems(prevItems =>
-      prevItems.map(item =>
-        item.id === currentItem.id
-          ? { ...item, adjustStock: (item.adjustStock || 0) + addValue }
-          : item
-      )
-    );
+    // strict validation (digits only)
+    if (!/^\d+$/.test(stockValue)) {
+      setSnackbar({ open: true, message: 'Please enter a valid stock number.' });
+      return;
+    }
 
-    setSnackbar({ open: true, message: `✅ Stock updated for ${currentItem.name}` });
-    handleCloseDialog();
+    try {
+      const response = await fetch(
+        'https://api2.nextorbitals.in/api/add_item.php',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            hotel_name: hotelName,
+            issingle: true,
+            ovweridestock: true,
+            menuItems: [
+              {
+                id: currentItem.id,
+                // menu: currentItem.menu,
+                // submenu: currentItem.submenu,
+                // purchaseprice: currentItem.purchaseprice || 0,
+                // mrp: currentItem.mrp || 0,
+
+                // ✅ ABSOLUTE OVERWRITE AS STRING
+                morning_stock: stockValue,
+                stock: stockValue
+              }
+            ]
+          })
+        }
+      );
+      console.log("response",response);
+      const result = await response.json();
+
+      if (!response.ok || result.success === false) {
+        throw new Error(result.message || 'Failed to update stock');
+      }
+
+      // ✅ Update UI AFTER backend success
+      setTimeout(() => {
+        setItems(prevItems =>
+          prevItems.map(item =>
+            item.id === currentItem.id
+              ? { ...item, stock: stockValue, adjustStock: stockValue }
+              : item
+          )
+        );
+      }, 100); // 100ms delay to ensure UI refresh
+
+      // Update localStorage as well
+      const localStorageKey = `menu_${hotelName}`;
+      const storedMenuItems = JSON.parse(localStorage.getItem(localStorageKey) || '[]');
+      const updatedMenuItems = storedMenuItems.map(item => {
+        if (item.id === currentItem.id) {
+          return {
+            ...item,
+            stock: stockValue, // Update the 'stock' property
+            adjustStock: stockValue // Also update 'adjustStock' for consistency with UI display
+          };
+        }
+        return item;
+      });
+      localStorage.setItem(localStorageKey, JSON.stringify(updatedMenuItems));
+
+      setSnackbar({
+        open: true,
+        message: `✅ Stock updated for ${currentItem.submenu}`
+      });
+
+      // saveItemQTY(currentItem.id,currentItem.name,stockValue);
+
+      handleCloseDialog();
+
+    } catch (error) {
+      console.error(error);
+      setSnackbar({
+        open: true,
+        message: `❌ ${error.message}`
+      });
+    }
   };
-
-  if (loading) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>;
-  }
-
-  if (error) {
-    return <Box sx={{ textAlign: 'center', mt: 4 }}><Typography color="error">{error}</Typography></Box>;
-  }
 
   return (
     <>
@@ -197,7 +291,7 @@ export const InventoryPage = () => {
         color="primary"
         aria-label="add"
         sx={{ position: 'fixed', bottom: 16, right: 16 }}
-        onClick={() => navigate('/add-item', { state: { hotelName } })}
+        onClick={() => navigate('/add-item', { state: { hotelName , lastid } })}
       >
         <AddIcon />
       </Fab>
@@ -214,7 +308,7 @@ export const InventoryPage = () => {
             fullWidth
             variant="outlined"
             value={stockToAdd}
-            onChange={(e) => setStockToAdd(e.target.value)}
+            onChange={(e) => setStockToAdd( e.target.value)}
             onKeyPress={(e) => { if (e.key === 'Enter') { handleAdjustStock(); } }}
           />
         </DialogContent>

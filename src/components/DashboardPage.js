@@ -22,7 +22,10 @@ const TransactionRow = ({ row, sx }) => {
   try {
     if (row.cart_data && typeof row.cart_data === 'string') {
       const validJsonString = row.cart_data.replace(/'/g, '"');
-      parsedCartData = JSON.parse(validJsonString);
+      const result = JSON.parse(validJsonString);
+      if (Array.isArray(result)) {
+        parsedCartData = result;
+      }
     }
   } catch (error) {
     console.error("Failed to parse cart_data:", row.cart_data, error);
@@ -133,7 +136,7 @@ export const DashboardPage = () => {
 
   const handleActionChange = (event) => {
     const page = event.target.value;
-    if (page === 'InventoryPage' || page === 'profit-report') {
+    if (page === 'inventory' || page === 'profit-report' || page === 'stockSummery') {
       setActionTarget(page); // Set which page we're targeting
       setIsHotelSelectionOpen(true);
     }  else if (page) {
@@ -146,11 +149,8 @@ export const DashboardPage = () => {
 
   const handleHotelSelectAndNavigate = (hotelName) => {
     setIsHotelSelectionOpen(false);
-    if (actionTarget === 'InventoryPage') {
-      navigate(`/inventory/${hotelName}`);
-    } else {
-      navigate(`/${actionTarget}/${hotelName}`);
-    }
+    navigate(`/${actionTarget}/${hotelName}`);
+
   };
 
   const handleSync = async () => {
@@ -268,7 +268,8 @@ export const DashboardPage = () => {
           <FormControl sx={{ m: 1, minWidth: 120 }} size="small">
             <InputLabel id="actions-select-label" sx={{ color: 'white', '&.Mui-focused': { color: 'white' } }}>Actions</InputLabel>
             <Select labelId="actions-select-label" label="Actions" onChange={handleActionChange} value="" sx={{ color: 'white', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.5)' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'white' }, '.MuiSvgIcon-root': { color: 'white' } }}>
-              <MenuItem value="InventoryPage">Inventory</MenuItem>
+              <MenuItem value="inventory">Inventory</MenuItem>
+              <MenuItem value="stockSummery">Stock Summary</MenuItem>
               <MenuItem value="profit-report">Profit Report</MenuItem>
               <MenuItem value="gst-report">GST Report</MenuItem>
               <MenuItem value="tally-reports">Tally Reports</MenuItem>
@@ -291,14 +292,6 @@ export const DashboardPage = () => {
           <Grid container spacing={{ xs: 1, sm: 3 }} alignItems="center">
             <Grid item xs={12} sm={6}><FormControl fullWidth size="small"><InputLabel>Hotel Name</InputLabel><Select value={selectedHotel} label="Hotel Name" onChange={(e) => setSelectedHotel(e.target.value)}>{hotelNames.map(name => <MenuItem key={name} value={name}>{name}</MenuItem>)}</Select></FormControl></Grid>
             <Grid item xs={12} sm={6}><FormControl fullWidth size="small"><InputLabel>Time Period</InputLabel><Select value={timeFilter} label="Time Period" onChange={(e) => setTimeFilter(e.target.value)}><MenuItem value="Day">Last 7 Days</MenuItem><MenuItem value="Month">Last 7 Months</MenuItem><MenuItem value="Year">Last 7 Years</MenuItem></Select></FormControl></Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Hotel Name</InputLabel>
-                <Select value={selectedHotel} label="Hotel Name" onChange={(e) => setSelectedHotel(e.target.value)}>
-                  {hotelNames.map(name => <MenuItem key={name} value={name}>{name}</MenuItem>)}
-                </Select>
-              </FormControl>
-            </Grid>
           </Grid>
         </Paper>
 
@@ -388,14 +381,6 @@ export const DashboardPage = () => {
                 <Box sx={{ textAlign: 'center', }}>
                   <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: { xs: '0.65rem', sm: '0.875rem' } }}>
                     {isMobile ? "UPI" : "UPI"}
-                  </Typography>
-                  <Typography variant="h6" sx={{ color: '#1565c0', fontSize: { xs: '0.8rem', sm: '1.25rem' } }}>
-                    ₹{tableTotals.upi.toLocaleString()}
-                  </Typography>
-                </Box>
-                <Box sx={{ textAlign: 'center', }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: { xs: '0.65rem', sm: '0.875rem' } }}>
-                    {isMobile ? "Profit" : "PROFIT"}
                   </Typography>
                   <Typography variant="h6" sx={{ color: '#1565c0', fontSize: { xs: '0.8rem', sm: '1.25rem' } }}>
                     ₹{tableTotals.upi.toLocaleString()}

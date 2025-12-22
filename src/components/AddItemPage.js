@@ -12,6 +12,9 @@ const AddItemPage = () => {
   const navigate = useNavigate();
   const { itemId } = useParams();
   const location = useLocation();
+  const hotelName = location.state?.hotelName;
+  const lastid = location.state?.lastid;
+  console.log("name",hotelName,"lastid",lastid );
   const isEditing = Boolean(itemId);
 
   const [formState, setFormState] = useState({
@@ -27,6 +30,16 @@ const AddItemPage = () => {
     itemCode: '',
     barCode: '',
     adjustStock: '',
+    nonAcPrice: '',
+    nonAcPriceHalf: '',
+    onlinePrice: '',
+    onlinePriceHalf: '',
+    parcelPrice: '',
+    parcelPriceHalf: '',
+    description: '',
+    available: '1', // Default to 1 (Available)
+    itemvnv: '1',   // Default to 1 (Veg)
+    gst: '',
   });
 
   const [image, setImage] = useState(null);
@@ -41,20 +54,31 @@ const AddItemPage = () => {
   useEffect(() => {
     if (isEditing && location.state?.item) {
       const item = location.state.item;
+      console.log("item",item);
       setFormState({
-        name: item.name || '',
+        name: item.submenu || '',
         submenu: item.submenu || '',
         h_price: item.h_price || '',
         f_price: item.f_price || '',
-        category: item.category || '',
+        category: item.menu || '',
         mrp: item.mrp || '',
         purchasePrice: item.purchaseprice || '',
         acSellPrice: item.ac_price || '',
         acSellPriceHalf: item.ac_price_half || '',
         hsnCode: item.hsnCode || '',
-        itemCode: item.itemCode || '',
+        itemCode: item.id || '',
         barCode: item.barCode || '',
         adjustStock: item.adjustStock || '0',
+        nonAcPrice: item.nonac_price || '',
+        nonAcPriceHalf: item.nonac_price_half || '',
+        onlinePrice: item.online_price || '',
+        onlinePriceHalf: item.online_price_half || '',
+        parcelPrice: item.parcel_price || '',
+        parcelPriceHalf: item.parcel_price_half || '',
+        description: item.description || '',
+        available: String(item.available ?? '1'),
+        itemvnv: String(item.itemvnv ?? '1'),
+        gst: String(item.gst || ''),
       });
       // In a real app, you would also handle loading the image URL
     }
@@ -62,8 +86,7 @@ const AddItemPage = () => {
 
   useEffect(() => {
     const loadCategories = async () => {
-      const hotelName = location.state?.hotelName;
-      if (hotelName) {
+      if (hotelName) { // Use hotelName from component scope
         try {
           const menuItems = await fetchMenu(hotelName);
           if (menuItems && menuItems.length > 0) {
@@ -77,7 +100,9 @@ const AddItemPage = () => {
       }
     };
     loadCategories();
-  }, [location.state]);
+  }, [hotelName]); // Depend on hotelName
+
+  
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormState(prev => ({ ...prev, [name]: value }));
@@ -114,22 +139,97 @@ const AddItemPage = () => {
     handleCloseCategoryDialog();
   };
 
-  const handleSave = () => {
-    // In a real application, you would have form validation here
-    // and then send the data to your backend API.
+  const handleSave = async () => {
+    if (!hotelName) {
+      setSnackbar({ open: true, message: '❌ Hotel name not found. Cannot save.' });
+      return;
+    }
 
-    // Example:
-    // const formData = new FormData();
-    // Object.keys(formState).forEach(key => formData.append(key, formState[key]));
-    // if (image) {
-    //   formData.append('itemImage', image);
-    // }
-    // const endpoint = isEditing ? `/api/items/${itemId}` : '/api/items';
-    // const method = isEditing ? 'PUT' : 'POST';
-    // fetch(endpoint, { method, body: formData }).then(...);
+    try {
+      const payload = {
+        hotel_name: hotelName,
+        menuItems: [
+          {
+            id: formState.itemCode || itemId || `item_${Date.now()}`,
+            menu: formState.category,
+            submenu: formState.name,
 
-    setSnackbar({ open: true, message: `✅ Item ${isEditing ? 'updated' : 'saved'} successfully!` });
-    setTimeout(() => navigate(-1), 1500); // Go back after showing snackbar
+            h_price: Number(formState.h_price || 0),
+            f_price: Number(formState.f_price || 0),
+
+            ac_price: Number(formState.acSellPrice || 0),
+            ac_price_half: Number(formState.acSellPriceHalf || 0),
+            
+            nonac_price: Number(formState.nonAcPrice || 0),
+            nonac_price_half: Number(formState.nonAcPriceHalf || 0),
+            online_price: Number(formState.onlinePrice || 0),
+            online_price_half: Number(formState.onlinePriceHalf || 0),
+            parcel_price: Number(formState.parcelPrice || 0),
+            parcel_price_half: Number(formState.parcelPriceHalf || 0),
+
+            purchaseprice: Number(formState.purchasePrice || 0),
+            mrp: Number(formState.mrp || 0),
+
+            stock: String(formState.adjustStock || 0), // 🔒 keep as string
+            available: Number(formState.available),
+            itemvnv: Number(formState.itemvnv),
+            description: formState.description || '',
+            gst: Number(formState.gst || 0),
+
+          }
+        ]
+      };
+      console.log("payload in add item page",payload);
+      const response = await fetch(
+        'https://api2.nextorbitals.in/api/add_item.php',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || result.success === false) {
+        throw new Error(result.message || 'Save failed');
+      }
+
+      // Update localStorage
+      const localStorageKey = `menu_${hotelName}`;
+      const storedMenuItems = JSON.parse(localStorage.getItem(localStorageKey) || '[]');
+      const newItem = payload.menuItems[0];
+      const itemIndex = storedMenuItems.findIndex(item => item.id === newItem.id);
+
+      let updatedMenuItems;
+      if (itemIndex > -1) {
+        // Item exists, update it by merging new data
+        storedMenuItems[itemIndex] = { ...storedMenuItems[itemIndex], ...newItem };
+        updatedMenuItems = storedMenuItems;
+      } else {
+        // New item, add it to the beginning of the list
+        updatedMenuItems = [newItem, ...storedMenuItems];
+      }
+
+      localStorage.setItem(localStorageKey, JSON.stringify(updatedMenuItems));
+
+      setSnackbar({
+        open: true,
+        message: `✅ Item ${isEditing ? 'updated' : 'saved'} successfully`
+      });
+
+      // Navigate back and signal that the list was updated
+      setTimeout(() => navigate(`/inventory/${hotelName}`, { state: { itemUpdated: true } }), 1200);
+
+    } catch (err) {
+      console.error(err);
+      setSnackbar({
+        open: true,
+        message: `❌ ${err.message}`
+      });
+    }
   };
 
   return (
@@ -184,7 +284,7 @@ const AddItemPage = () => {
             <TextField
               name="name"
               label="Product/Service Name"
-              value={formState.submenu}
+              value={formState.name}
               onChange={handleInputChange}
               fullWidth
               required
@@ -279,6 +379,9 @@ const AddItemPage = () => {
                   <Grid item xs={12}>
                     <TextField name="barCode" label="Barcode" value={formState.barCode} onChange={handleInputChange} fullWidth />
                   </Grid>
+                    <Grid item xs={12}>
+                    <TextField name="gst" label="gst" value={formState.gst} onChange={handleInputChange} fullWidth />
+                  </Grid>
                 </Grid>
               </AccordionDetails>
             </Accordion>
@@ -288,14 +391,43 @@ const AddItemPage = () => {
                 <Typography>Inventory Details (Optional)</Typography>
               </AccordionSummary>
               <AccordionDetails>
-                <TextField
-                  name="adjustStock"
-                  label="Opening Stock"
-                  value={formState.adjustStock}
-                  onChange={handleInputChange}
-                  type="number"
-                  fullWidth
-                />
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      name="adjustStock"
+                      label="Opening Stock"
+                      value={formState.adjustStock}
+                      onChange={handleInputChange}
+                      type="number"
+                      fullWidth
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <FormControl fullWidth>
+                      <InputLabel>Availability</InputLabel>
+                      <Select name="available" value={formState.available} label="Availability" onChange={handleInputChange}>
+                        <MenuItem value="1">Available</MenuItem>
+                        <MenuItem value="0">Not Available</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <FormControl fullWidth>
+                      <InputLabel>Type</InputLabel>
+                      <Select name="itemvnv" value={formState.itemvnv} label="Type" onChange={handleInputChange}>
+                        <MenuItem value="1">Veg</MenuItem>
+                        <MenuItem value="2">Non-Veg</MenuItem>
+                        <MenuItem value="3">Contains Egg</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      name="description" label="Description" value={formState.description}
+                      onChange={handleInputChange} fullWidth multiline rows={2}
+                    />
+                  </Grid>
+                </Grid>
               </AccordionDetails>
             </Accordion>
 
@@ -306,10 +438,28 @@ const AddItemPage = () => {
               <AccordionDetails>
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={6}>
-                    <TextField name="acSellPrice" label="AC Price" value={formState.acSellPrice} onChange={handleInputChange} fullWidth type="number" />
+                    <TextField name="acSellPrice" label="AC Price (Full)" value={formState.acSellPrice} onChange={handleInputChange} fullWidth type="number" />
                   </Grid>
                   <Grid item xs={12} sm={6}>
-                    <TextField name="acSellPriceHalf" label="Half AC Price" value={formState.acSellPriceHalf} onChange={handleInputChange} fullWidth type="number" />
+                    <TextField name="acSellPriceHalf" label="AC Price (Half)" value={formState.acSellPriceHalf} onChange={handleInputChange} fullWidth type="number" />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField name="nonAcPrice" label="Non-AC Price (Full)" value={formState.nonAcPrice} onChange={handleInputChange} fullWidth type="number" />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField name="nonAcPriceHalf" label="Non-AC Price (Half)" value={formState.nonAcPriceHalf} onChange={handleInputChange} fullWidth type="number" />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField name="onlinePrice" label="Online Price (Full)" value={formState.onlinePrice} onChange={handleInputChange} fullWidth type="number" />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField name="onlinePriceHalf" label="Online Price (Half)" value={formState.onlinePriceHalf} onChange={handleInputChange} fullWidth type="number" />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField name="parcelPrice" label="Parcel Price (Full)" value={formState.parcelPrice} onChange={handleInputChange} fullWidth type="number" />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField name="parcelPriceHalf" label="Parcel Price (Half)" value={formState.parcelPriceHalf} onChange={handleInputChange} fullWidth type="number" />
                   </Grid>
                 </Grid>
               </AccordionDetails>
@@ -349,5 +499,6 @@ const AddItemPage = () => {
     </>
   );
 };
+
 
 export default AddItemPage;
