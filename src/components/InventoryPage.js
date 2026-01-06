@@ -4,7 +4,7 @@ import {
   Grid, Box, CircularProgress, Fab, Dialog, DialogActions, DialogContent,
   DialogTitle, Button, Snackbar
 } from '@mui/material';
-import { Add as AddIcon, Search as SearchIcon, Clear as ClearIcon, Check as CheckIcon, Image as ImageIcon, ArrowBack as ArrowBackIcon, Sync as SyncIcon, TimerOutlined } from '@mui/icons-material';
+import { Add as AddIcon, Search as SearchIcon, Clear as ClearIcon, Check as CheckIcon, Image as ImageIcon, ArrowBack as ArrowBackIcon, Sync as SyncIcon, SnoozeRounded } from '@mui/icons-material';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { fetchMenu, syncMenu } from '../api';
 
@@ -56,6 +56,51 @@ export const InventoryPage = () => {
     } catch (err) {
       setError(err.message);
       console.error("Error syncing menu:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  const makeStockZero = async () => {
+    setLoading(true);
+    try {
+      // This assumes the backend can handle a batch update.
+      // const menuItemsToUpdate = items.map(item => ({
+      //   id: item.id,
+      //   morning_stock: '0',
+      //   stock: '0',
+      // }));
+
+      // const response = await fetch('https://api2.nextorbitals.in/api/add_item.php', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({
+      //     hotel_name: hotelName,
+      //     ovweridestock: true,
+      //     menuItems: menuItemsToUpdate,
+      //   }),
+      // });
+
+      // const result = await response.json();
+
+      // if (!response.ok || result.success === false) {
+      //   throw new Error(result.message || 'Failed to set all stocks to zero');
+      // }
+
+      // If API call is successful, update local state
+      const updatedItems = items.map(item => ({ ...item, adjustStock: 0, stock: 0 }));
+      setItems(updatedItems);
+
+      // Update localStorage as well
+      const localStorageKey = `menu_${hotelName}`;
+      localStorage.setItem(localStorageKey, JSON.stringify(updatedItems));
+
+      setSnackbar({ open: true, message: 'All item stocks set to zero successfully!' });
+    } catch (err) {
+      setError(err.message);
+      console.error("Error setting stock to zero:", err);
+      setSnackbar({ open: true, message: `❌ ${err.message}` });
     } finally {
       setLoading(false);
     }
@@ -134,9 +179,9 @@ export const InventoryPage = () => {
             ovweridestock: true,
             menuItems: [
               {
-                id: currentItem.id,
+                // id: currentItem.id,
                 // menu: currentItem.menu,
-                // submenu: currentItem.submenu,
+                submenu: currentItem.submenu,
                 // purchaseprice: currentItem.purchaseprice || 0,
                 // mrp: currentItem.mrp || 0,
 
@@ -224,6 +269,9 @@ export const InventoryPage = () => {
               Inventory ({filteredItems.length})
             </Typography>
           )}
+          <IconButton title="Set All Stock to Zero" color="inherit" onClick={makeStockZero}>
+            <SnoozeRounded />
+          </IconButton>
           <IconButton color="inherit" onClick={handleSync}>
             <SyncIcon />
           </IconButton>

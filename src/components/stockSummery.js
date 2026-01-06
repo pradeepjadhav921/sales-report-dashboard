@@ -110,11 +110,11 @@ export const StockSummery = () => {
     doc.text(`Stock Summary - ${hotelName?.replaceAll("_", " ")}`, 14, 15);
     doc.text(`Date: ${dateStr}`, 14, 22);
 
-    const tableColumn = ["ID", "Item Name", "Added Stock", "Sold Stock", "Available Stock"];
+    const tableColumn = ["ID", "Item Name", "Open Stock", "Sold Stock", "Available Stock"];
     const tableRows = sortedAndFilteredItems.map(item => {
-      const added = parseFloat(item.morning_stock || 0);
-      const sold = parseFloat(item.adjustStock || 0);
-      const available = added - sold;
+      const added = parseFloat(item.morning_stock || 0);  //10
+      const available = parseFloat(item.adjustStock || 0);
+      const sold =  added - available; //8
       return [item.id, item.submenu, added, sold, available];
     });
 
@@ -214,7 +214,7 @@ export const StockSummery = () => {
               <TableRow sx={{ '& th': { fontWeight: 'bold' } }}>
                 <TableCell>ID</TableCell>
                 <TableCell>Item Name</TableCell>
-                <TableCell align="right">Added Stock</TableCell>
+                <TableCell align="right">Open Stock</TableCell>
                 <TableCell align="right">Sold Stock</TableCell>
                 <TableCell align="right">
                   <TableSortLabel
@@ -230,8 +230,9 @@ export const StockSummery = () => {
             <TableBody>
               {sortedAndFilteredItems.map((item, index) => {
                 const added = parseFloat(item.morning_stock || 0);
-                const sold = parseFloat(item.adjustStock || 0);
-                const available = added - sold;
+                const available =  parseFloat(item.adjustStock || 0);
+                const sold = added - available;
+                
 
                 return (
                   <TableRow key={item.id || index}>
